@@ -172,7 +172,15 @@ def is_applicable(state: State, action: Action) -> bool:
     Tip: frozenset supports the .issubset() method and the .isdisjoint() method.
     """
     ### Your code here ###
-    return False
+    for precond in action.precond_pos:
+        if precond not in state:
+            return False
+        
+    for precond in action.precond_neg:
+        if precond in state:
+            return False
+    
+    return True
     ### End of your code ###
 
 
@@ -186,7 +194,16 @@ def apply_action(state: State, action: Action) -> State:
     The order matters: first remove del_list, then add add_list.
     """
     ### Your code here ###
-    return frozenset({})
+    new_state = set(state)
+    
+    for fluent in action.del_list:
+        if fluent in new_state:
+            new_state.remove(fluent)
+    
+    for fluent in action.add_list:
+        new_state.add(fluent)
+    
+    return frozenset(new_state)
     ### End of your code ###
 
 
@@ -241,5 +258,14 @@ def get_applicable_actions(
          Or use get_all_groundings() and filter the results by applicability.
     """
     ### Your code here ###
-    return []
+    applicable =[]
+    
+    all_grounded = get_all_groundings(domain, objects)
+
+    for action in all_grounded:
+
+        if is_applicable(state, action):
+            applicable.append(action)
+
+    return applicable   
     ### End of your code ###
