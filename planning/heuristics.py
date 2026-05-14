@@ -45,7 +45,32 @@ def ignorePreconditionsHeuristic(
          Remember: with no preconditions, every grounding is "applicable".
     """
     ### Your code here ###
+    from planning.pddl import get_all_groundings
 
+    unsatisfied = set(goal) - set(state)
+    if not unsatisfied:
+        return 0.0
+
+    all_actions = get_all_groundings(domain, objects)
+    actions_count = 0
+
+    while unsatisfied:
+        best_action = None
+        max_covered = 0
+
+        for action in all_actions:
+            covered = len(action.add_list.intersection(unsatisfied))
+            if covered > max_covered:
+                max_covered = covered
+                best_action = action
+
+        if best_action is None:
+            return float('inf')
+
+        unsatisfied = unsatisfied - best_action.add_list
+        actions_count += 1
+
+    return float(actions_count)
     ### End of your code ###
 
 
@@ -79,5 +104,31 @@ def ignoreDeleteListsHeuristic(
          each step (preconditions still apply in the relaxed model).
     """
     ### Your code here ###
+    from planning.pddl import get_applicable_actions
 
+    current_state = set(state)
+    target_goal = set(goal)
+    actions_count = 0
+
+    while not target_goal.issubset(current_state):
+        unsatisfied = target_goal - current_state
+        
+        applicable_actions = get_applicable_actions(frozenset(current_state), domain, objects)
+        
+        best_action = None
+        max_added = 0
+
+        for action in applicable_actions:
+            added = len(action.add_list.intersection(unsatisfied))
+            if added > max_added:
+                max_added = added
+                best_action = action
+
+        if best_action is None:
+            return float('inf')
+
+        current_state.update(best_action.add_list)
+        actions_count += 1
+
+    return float(actions_count)
     ### End of your code ###

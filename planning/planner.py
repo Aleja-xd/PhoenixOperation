@@ -214,9 +214,60 @@ def aStarPlanner(
     Tip: The heuristic signature is heuristic(state, goal, domain, objects) → float.
          Use PriorityQueue with priority = g + h(next_state).
          Track the best g-cost seen for each state to avoid stale expansions.
-    """
-    ### Your code here ###
 
+Version inicial si IAG: 
+    
+     frontier = PriorityQueue()
+     start_state = problem.getStartState()
+     frontier.push((start_state, []), 0)
+     
+     while not frontier.isEmpty():
+         current_state, plan = frontier.pop()
+         
+         if problem.isGoalState(current_state):
+             return plan
+             
+         for next_state, action, cost in problem.getSuccessors(current_state):
+             new_plan = plan + [action]
+             h_cost = heuristic(next_state, problem.goal, problem.domain, problem.objects)
+             frontier.push((next_state, new_plan), h_cost)
+     
+     return []
+
+prompt: Ayudame a corregir esta funcion aStarPlanner, trate de hacer la estructura basica de A* usando la PriorityQueue,
+pero el programa se queda corriendo infinitamente o expande nodos de forma ineficiente para este problema PDDL.
+Me faltan detalles importantes sobre el calculo correcto de f(n) con la heuristica y como manejar estados
+repetidos, pero no se como ajustarlo, completalo para que funcione en este caso especifico?
+"""
+    ### Your code here ###
+    frontier = PriorityQueue()
+    start_state = problem.getStartState()
+    h_start = heuristic(start_state, problem.goal, problem.domain, problem.objects)
+    frontier.push((start_state, []), 0 + h_start)
+    best_g = {start_state: 0}
+
+    while not frontier.isEmpty():
+        current_state, plan = frontier.pop()
+
+        if problem.isGoalState(current_state):
+            return plan
+
+        g_cost = len(plan)
+
+        if g_cost > best_g.get(current_state, float('inf')):
+            continue
+
+        for next_state, action, cost in problem.getSuccessors(current_state):
+            new_g = g_cost + cost
+            new_plan = plan + [action]
+
+            if new_g < best_g.get(next_state, float('inf')):
+                best_g[next_state] = new_g
+                h_cost = heuristic(next_state, problem.goal, problem.domain, problem.objects)
+                f_cost = new_g + h_cost
+                frontier.push((next_state, new_plan), f_cost)
+
+    return []
     ### End of your code ###
 
 
