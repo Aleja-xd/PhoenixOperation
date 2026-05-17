@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable
 
 from planning.pddl import (
@@ -136,10 +137,98 @@ def forwardBFS(problem: Problem) -> list[Action]:
     Tip: The state is a frozenset of fluents. Use problem.getSuccessors(state)
          to get (next_state, action, cost) triples. Track visited states to
          avoid revisiting the same state twice (graph search, not tree search).
-    """
-    ### Your code here ###
+    
+Código inicial:
 
-    ### End of your code ###
+    start = problem.getStartState()
+
+    if problem.isGoalState(start):
+        return []
+        
+    frontier = deque()
+    frontier.append(start)
+    visited = set() 
+    parent = {}
+
+    while len(frontier) > 0:
+        current = frontier.popleft()
+        successors = problem.getSuccessors(current)
+        for successor in successors:
+            nextState = successor[0]
+            action = successor[1]
+
+            if nextState not in visited:
+                parent[nextState] = (current, action)
+
+                if problem.isGoalState(nextState):
+                    moves = []
+                    state = nextState
+
+                    while state != start:
+                        previous = parent[state][0]
+                        step = parent[state][1]
+                        moves.append(step)
+                        state = previous
+
+                    moves.reverse()
+                    return moves
+
+                visited.add(nextState)
+                frontier.append(nextState)
+
+    return []
+
+    Prompt:
+    Tu tarea es arreglar este código de búsqueda BFS hacia adelante para que sea más claro, 
+    más compacto y más cercano a una implementación formal. Mantén exactamente la misma lógica 
+    general: obtener el estado inicial, revisar si ya es meta, usar una cola como frontera, 
+    guardar los estados visitados, guardar padres para reconstruir el plan y retornar la lista 
+    de acciones cuando se encuentre la meta. También corrige detalles menores de estilo, nombres 
+    de variables y estructura, así como posibles errores logicos que puedan existir. Al finalizar 
+    entrégame una lista de los cambios realizados.
+
+
+    Cambios realizados:
+    1. Se cambió `start` por `start_state`.
+    2. Se cambió `frontier = deque(); frontier.append(start)` por `frontier = deque([start_state])`.
+    3. Se cambió `visited = set()` por `visited = {start_state}`.
+    4. Se cambió `parent = {}` por `parent: dict[State, tuple[State, Action]] = {}`.
+    5. Se cambió `while len(frontier) > 0:` por `while frontier:`.
+    6. Se cambió `current` por `current_state`.
+    7. Se reemplazó el acceso manual `successor[0]` y `successor[1]` por desempaquetado directo: `for next_state, action, _ in ...`.
+    8. Se usó `continue` cuando el estado ya estaba visitado.
+    9. Se cambió `moves` por `plan`.
+    10. Se simplificó la reconstrucción del camino con `state, step = parent[state]`.  
+    """
+    start_state = problem.getStartState()
+    if problem.isGoalState(start_state):
+        return []
+
+    frontier = deque([start_state])
+    visited = {start_state}
+    parent: dict[State, tuple[State, Action]] = {}
+
+    while frontier:
+        current_state = frontier.popleft()
+
+        for next_state, action, _ in problem.getSuccessors(current_state):
+            if next_state in visited:
+                continue
+
+            parent[next_state] = (current_state, action)
+            if problem.isGoalState(next_state):
+                plan: list[Action] = []
+                state = next_state
+                while state != start_state:
+                    state, step = parent[state]
+                    plan.append(step)
+                plan.reverse()
+                return plan
+
+            visited.add(next_state)
+            frontier.append(next_state)
+
+    return []
 
 
 # ---------------------------------------------------------------------------
