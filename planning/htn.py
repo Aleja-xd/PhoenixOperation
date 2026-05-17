@@ -427,26 +427,9 @@ def build_htn_hierarchy(problem: Problem) -> list[HLA]:
     initial = problem.initial_state
 
     robot = problem.objects["robots"][0]
-    patient = problem.objects["patients"][0]
-    supplies = problem.objects["supplies"][0]
+    patients = problem.objects["patients"]
+    supplies_list = problem.objects["supplies"]
     medical_post = problem.objects["medical_posts"][0]
-
-    robot_loc = None
-    patient_loc = None
-    supplies_loc = None
-
-    for fluent in initial:
-
-        if fluent[0] == "At":
-
-            if fluent[1] == robot:
-                robot_loc = fluent[2]
-
-            elif fluent[1] == patient:
-                patient_loc = fluent[2]
-
-            elif fluent[1] == supplies:
-                supplies_loc = fluent[2]
 
     all_actions = get_all_groundings(
         problem.domain,
@@ -457,8 +440,6 @@ def build_htn_hierarchy(problem: Problem) -> list[HLA]:
 
         queue = [([], start)]
         visited = set()
-
-        queue = [([], start)]
 
         while queue:
 
@@ -471,9 +452,9 @@ def build_htn_hierarchy(problem: Problem) -> list[HLA]:
                 continue
 
             visited.add(current)
-            
+
             temp_state = set(initial)
-            
+
             for fluent in list(temp_state):
 
                 if fluent[0] == "At" and fluent[1] == robot:
@@ -487,9 +468,10 @@ def build_htn_hierarchy(problem: Problem) -> list[HLA]:
 
                 if not action.name.startswith("Move"):
                     continue
+
                 if not is_applicable(temp_state, action):
                     continue
-                
+
                 next_pos = None
 
                 for fluent in action.add_list:
@@ -505,173 +487,216 @@ def build_htn_hierarchy(problem: Problem) -> list[HLA]:
                             next_pos
                         )
                     )
+
         return []
 
-    path_to_supplies = build_navigation_plan(
-        robot_loc,
-        supplies_loc
+    robot_loc = next(
+        f[2]
+        for f in initial
+        if f[0] == "At" and f[1] == robot
     )
 
-    path_to_medical_supplies = build_navigation_plan(
-        supplies_loc,
-        medical_post
-    )
+    missions = []
 
-    path_to_patient = build_navigation_plan(
-        medical_post,
-        patient_loc
-    )
+    for patient, supplies in zip(patients, supplies_list):
 
-    path_to_medical_patient = build_navigation_plan(
-        patient_loc,
-        medical_post
-    )
+        patient_loc = None
+        supplies_loc = None
 
-    navigate_to_supplies = HLA("NavigateToSupplies")
+        for fluent in initial:
 
-    navigate_to_supplies.refinements = [
-        path_to_supplies
-    ]
+            if fluent[0] == "At":
 
-    navigate_to_medical_supplies = HLA(
-        "NavigateToMedicalSupplies"
-    )
+                if fluent[1] == patient:
+                    patient_loc = fluent[2]
 
-    navigate_to_medical_supplies.refinements = [
-        path_to_medical_supplies
-    ]
+                elif fluent[1] == supplies:
+                    supplies_loc = fluent[2]
 
-    navigate_to_patient = HLA("NavigateToPatient")
+        path_to_supplies = build_navigation_plan(
+            robot_loc,
+            supplies_loc
+        )
 
-    navigate_to_patient.refinements = [
-        path_to_patient
-    ]
+        path_to_medical_supplies = build_navigation_plan(
+            supplies_loc,
+            medical_post
+        )
 
-    navigate_to_medical_patient = HLA(
-        "NavigateToMedicalPatient"
-    )
+        path_to_patient = build_navigation_plan(
+            medical_post,
+            patient_loc
+        )
 
-    navigate_to_medical_patient.refinements = [
-        path_to_medical_patient
-    ]
+        path_to_medical_patient = build_navigation_plan(
+            patient_loc,
+            medical_post
+        )
 
-    pickup_supplies = Action(
-        "PickUpSupplies",
-        [
-            ("At", robot, supplies_loc),
-            ("At", supplies, supplies_loc),
-            ("HandsFree", robot),
-            ("Pickable", supplies)
-        ],
-        [],
-        [
-            ("Holding", robot, supplies)
-        ],
-        [
-            ("At", supplies, supplies_loc),
-            ("HandsFree", robot)
+        navigate_to_supplies = HLA(
+            f"NavigateToSupplies({patient})"
+        )
+
+        navigate_to_supplies.refinements = [
+            path_to_supplies
         ]
-    )
 
-    setup_supplies = Action(
-        "SetupSupplies",
-        [
-            ("At", robot, medical_post),
-            ("Holding", robot, supplies),
-            ("MedicalPost", medical_post)
-        ],
-        [],
-        [
-            ("SuppliesReady", medical_post),
-            ("HandsFree", robot)
-        ],
-        [
-            ("Holding", robot, supplies)
+        navigate_to_medical_supplies = HLA(
+            f"NavigateToMedicalSupplies({patient})"
+        )
+
+        navigate_to_medical_supplies.refinements = [
+            path_to_medical_supplies
         ]
-    )
 
-    pickup_patient = Action(
-        "PickUpPatient",
-        [
-            ("At", robot, patient_loc),
-            ("At", patient, patient_loc),
-            ("HandsFree", robot),
-            ("Pickable", patient)
-        ],
-        [],
-        [
-            ("Holding", robot, patient)
-        ],
-        [
-            ("At", patient, patient_loc),
-            ("HandsFree", robot)
+        navigate_to_patient = HLA(
+            f"NavigateToPatient({patient})"
+        )
+
+        navigate_to_patient.refinements = [
+            path_to_patient
         ]
-    )
 
-    putdown_patient = Action(
-        "PutDownPatient",
-        [
-            ("At", robot, medical_post),
-            ("Holding", robot, patient)
-        ],
-        [],
-        [
-            ("At", patient, medical_post),
-            ("HandsFree", robot)
-        ],
-        [
-            ("Holding", robot, patient)
+        navigate_to_medical_patient = HLA(
+            f"NavigateToMedicalPatient({patient})"
+        )
+
+        navigate_to_medical_patient.refinements = [
+            path_to_medical_patient
         ]
-    )
 
-    rescue_patient = Action(
-        "RescuePatient",
-        [
-            ("At", robot, medical_post),
-            ("At", patient, medical_post),
-            ("MedicalPost", medical_post),
-            ("SuppliesReady", medical_post)
-        ],
-        [],
-        [
-            ("Rescued", patient)
-        ],
-        [
-            ("At", patient, medical_post)
-        ]
-    )
+        pickup_supplies = Action(
+            f"PickUpSupplies({supplies})",
+            [
+                ("At", robot, supplies_loc),
+                ("At", supplies, supplies_loc),
+                ("HandsFree", robot),
+                ("Pickable", supplies)
+            ],
+            [],
+            [
+                ("Holding", robot, supplies)
+            ],
+            [
+                ("At", supplies, supplies_loc),
+                ("HandsFree", robot)
+            ]
+        )
 
-    prepare = HLA("PrepareSupplies")
+        setup_supplies = Action(
+            f"SetupSupplies({supplies})",
+            [
+                ("At", robot, medical_post),
+                ("Holding", robot, supplies),
+                ("MedicalPost", medical_post)
+            ],
+            [],
+            [
+                ("SuppliesReady", medical_post),
+                ("HandsFree", robot)
+            ],
+            [
+                ("Holding", robot, supplies)
+            ]
+        )
 
-    prepare.refinements = [[
-        navigate_to_supplies,
-        pickup_supplies,
-        navigate_to_medical_supplies,
-        setup_supplies
-    ]]
+        pickup_patient = Action(
+            f"PickUpPatient({patient})",
+            [
+                ("At", robot, patient_loc),
+                ("At", patient, patient_loc),
+                ("HandsFree", robot),
+                ("Pickable", patient)
+            ],
+            [],
+            [
+                ("Holding", robot, patient)
+            ],
+            [
+                ("At", patient, patient_loc),
+                ("HandsFree", robot)
+            ]
+        )
 
-    extract = HLA("ExtractPatient")
+        putdown_patient = Action(
+            f"PutDownPatient({patient})",
+            [
+                ("At", robot, medical_post),
+                ("Holding", robot, patient)
+            ],
+            [],
+            [
+                ("At", patient, medical_post),
+                ("HandsFree", robot)
+            ],
+            [
+                ("Holding", robot, patient)
+            ]
+        )
 
-    extract.refinements = [[
-        navigate_to_patient,
-        pickup_patient,
-        navigate_to_medical_patient,
-        putdown_patient
-    ]]
+        rescue_patient = Action(
+            f"RescuePatient({patient})",
+            [
+                ("At", robot, medical_post),
+                ("At", patient, medical_post),
+                ("MedicalPost", medical_post),
+                ("SuppliesReady", medical_post)
+            ],
+            [],
+            [
+                ("Rescued", patient)
+            ],
+            [
+                ("At", patient, medical_post)
+            ]
+        )
 
-    rescue = HLA("RescuePatient")
+        prepare = HLA(
+            f"PrepareSupplies({patient})"
+        )
 
-    rescue.refinements = [[
-        rescue_patient
-    ]]
+        prepare.refinements = [[
+            navigate_to_supplies,
+            pickup_supplies,
+            navigate_to_medical_supplies,
+            setup_supplies
+        ]]
 
-    full_mission = HLA("FullRescueMission")
+        extract = HLA(
+            f"ExtractPatient({patient})"
+        )
 
-    full_mission.refinements = [[
-        prepare,
-        extract,
-        rescue
-    ]]
+        extract.refinements = [[
+            navigate_to_patient,
+            pickup_patient,
+            navigate_to_medical_patient,
+            putdown_patient
+        ]]
 
-    return [full_mission]
+        rescue = HLA(
+            f"Rescue({patient})"
+        )
+
+        rescue.refinements = [[
+            rescue_patient
+        ]]
+
+        full_mission = HLA(
+            f"FullRescueMission({patient})"
+        )
+
+        full_mission.refinements = [[
+            prepare,
+            extract,
+            rescue
+        ]]
+
+        missions.append(full_mission)
+
+        robot_loc = medical_post
+
+    root = HLA("FullRescueMission")
+    root.refinements = [missions]
+
+    return [root]
     ### End of your code ###
