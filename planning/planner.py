@@ -179,7 +179,7 @@ Código inicial:
     return []
 
     Prompt:
-    Tu tarea es arreglar este código de búsqueda BFS hacia adelante para que sea más claro, 
+    Tu tarea es arreglar este código de búsqueda forwardBFS para que sea más claro, 
     más compacto y más cercano a una implementación formal. Mantén exactamente la misma lógica 
     general: obtener el estado inicial, revisar si ya es meta, usar una cola como frontera, 
     guardar los estados visitados, guardar padres para reconstruir el plan y retornar la lista 
