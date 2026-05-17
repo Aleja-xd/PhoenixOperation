@@ -164,7 +164,11 @@ def regress(goal_set: State, action: Action) -> State | None:
          Check relevance first, then check for contradictions, then compute.
     """
     ### Your code here ###
-
+    if action.add_list.isdisjoint(goal_set):
+        return None
+    if not action.del_list.isdisjoint(goal_set):
+        return None
+    return (goal_set - action.add_list) | action.precond_pos
     ### End of your code ###
 
 
@@ -185,9 +189,100 @@ def backwardSearch(problem: Problem) -> list[Action]:
          (relevant actions). Use regress() to compute the new subgoal.
          Skip subgoals that contain static predicates (MedicalPost, Adjacent,
          Pickable) that are false in the initial state — these are dead ends.
-    """
-    ### Your code here ###
 
+Version inicial si IAG:
+
+    initial_state = problem.getStartState()
+    goal = problem.goal
+    all_actions = get_all_groundings(problem.domain, problem.objects)
+    STATIC = {"Adjacent", "MedicalPost", "Pickable"}
+
+    frontier = Queue()
+    frontier.push((goal, []))
+    visited = {goal}
+
+    while not frontier.isEmpty():
+        current_goal, plan_rev = frontier.pop()
+        problem._expanded += 1
+        if current_goal.issubset(initial_state):
+            return list(reversed(plan_rev))
+        for action in all_actions:
+            new_goal = regress(current_goal, action)
+            if new_goal is None:
+                continue
+            if any(f[0] in STATIC and f not in initial_state for f in new_goal):
+                continue
+            if new_goal in visited:
+                continue
+            visited.add(new_goal)
+            frontier.push((new_goal, plan_rev + [action]))
+    return []
+
+prompt: Tengo esta version de backwardSearch que funciona bien en tinyBase pero
+se queda sin terminar en layouts mas grandes. El problema es que explora demasiados
+subobjetivos inconsistentes, por ejemplo el robot en dos celdas a la vez, o sosteniendo
+un objeto y con HandsFree al mismo tiempo. Como puedo agregar podas que descarten esos
+subobjetivos imposibles sin cambiar la correctitud del algoritmo? Tambien, hay alguna
+forma de no iterar sobre todas las acciones en cada nodo sino solo las relevantes?
+"""
+    ### Your code here ###
+    initial_state = problem.getStartState()
+    goal = problem.goal
+    all_actions = get_all_groundings(problem.domain, problem.objects)
+
+    fluent_to_actions: dict = {}
+    for a in all_actions:
+        for f in a.add_list:
+            fluent_to_actions.setdefault(f, []).append(a)
+
+    STATIC = {"Adjacent", "MedicalPost", "Pickable"}
+
+    def is_consistent(sub: State) -> bool:
+        at_by_entity: dict = {}
+        for f in sub:
+            if f[0] == "At":
+                entity, loc = f[1], f[2]
+                if entity in at_by_entity and at_by_entity[entity] != loc:
+                    return False
+                at_by_entity[entity] = loc
+        if "robot" in at_by_entity:
+            if ("Free", at_by_entity["robot"]) in sub:
+                return False
+        if ("HandsFree", "robot") in sub:
+            if any(f[0] == "Holding" for f in sub):
+                return False
+        held = {f[2] for f in sub if f[0] == "Holding"}
+        if held and any(f[0] == "At" and f[1] in held for f in sub):
+            return False
+        return True
+
+    frontier = Queue()
+    frontier.push((goal, []))
+    visited: set[State] = {goal}
+
+    while not frontier.isEmpty():
+        current_goal, plan_rev = frontier.pop()
+        problem._expanded += 1
+        if current_goal.issubset(initial_state):
+            return list(reversed(plan_rev))
+        candidates: set = set()
+        for f in current_goal:
+            for a in fluent_to_actions.get(f, ()):
+                candidates.add(a)
+        for action in candidates:
+            new_goal = regress(current_goal, action)
+            if new_goal is None:
+                continue
+            if any(f[0] in STATIC and f not in initial_state for f in new_goal):
+                continue
+            if not is_consistent(new_goal):
+                continue
+            if new_goal in visited:
+                continue
+            visited.add(new_goal)
+            frontier.push((new_goal, plan_rev + [action]))
+
+    return []
     ### End of your code ###
 
 
